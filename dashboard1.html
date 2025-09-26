@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAR & Alert Ack Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            background: #f8fafc;
+            border: 2px dashed #e2e8f0;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #4f46e5;
+            background: #f1f5f9;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        .process-btn {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.3);
+        }
+
+        .process-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .combined-data {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            height: 400px; /* Fixed height to prevent expansion */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #374151;
+            text-align: center;
+            flex-shrink: 0; /* Prevent title from shrinking */
+        }
+
+        .chart-canvas-container {
+            flex: 1;
+            position: relative;
+            height: 300px; /* Fixed height for chart area */
+            min-height: 300px;
+        }
+
+        .chart-canvas-container canvas {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .report-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .report-org {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .report-org:last-child {
+            border-bottom: none;
+        }
+
+        .report-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .report-subtitle {
+            font-style: italic;
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .checkboxes {
+            display: flex;
+            gap: 40px;
+            margin-top: 20px;
+            font-size: 1.1rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-icon {
+            font-size: 1.2rem;
+            color: #4f46e5;
+        }
+
+        .status {
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status.error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .status.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .checkboxes {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DAR & Alert Ack Analysis Tool</h1>
+            <p>Upload your Weekly DAR and Alert Ack CSV files to generate comprehensive reports</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section">
+                <h3>Upload CSV Files</h3>
+                <p>Please upload both Weekly DAR Table and Weekly Alert Ack Table CSV files</p>
+                <br>
+                <input type="file" id="darFile" class="file-input" accept=".csv" />
+                <button class="upload-btn" onclick="document.getElementById('darFile').click()">
+                    Upload Weekly DAR Table CSV
+                </button>
+                <span id="darFileName"></span>
+                <br>
+                <input type="file" id="ackFile" class="file-input" accept=".csv" />
+                <button class="upload-btn" onclick="document.getElementById('ackFile').click()">
+                    Upload Weekly Alert Ack Table CSV
+                </button>
+                <span id="ackFileName"></span>
+                <br><br>
+                <button class="process-btn" id="processBtn" onclick="processData()" disabled>
+                    Process Data & Generate Report
+                </button>
+            </div>
+
+            <div id="statusDiv"></div>
+            <div id="resultsDiv" class="results-section" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let darData = null;
+        let ackData = null;
+        let chartInstances = []; // Track chart instances for cleanup
+
+        // File upload handlers
+        document.getElementById('darFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('darFileName').textContent = file.name;
+                parseCSV(file, (data) => {
+                    darData = data;
+                    checkFilesReady();
+                });
+            }
+        });
+
+        document.getElementById('ackFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('ackFileName').textContent = file.name;
+                parseCSV(file, (data) => {
+                    ackData = data;
+                    checkFilesReady();
+                });
+            }
+        });
+
+        function parseCSV(file, callback) {
+            Papa.parse(file, {
+                complete: function(results) {
+                    callback(results.data);
+                },
+                header: false,
+                skipEmptyLines: true
+            });
+        }
+
+        function checkFilesReady() {
+            const processBtn = document.getElementById('processBtn');
+            if (darData && ackData) {
+                processBtn.disabled = false;
+                showStatus('Both files loaded successfully!', 'success');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusDiv');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function destroyAllCharts() {
+            // Destroy all existing chart instances
+            chartInstances.forEach(chart => {
+                if (chart) {
+                    chart.destroy();
+                }
+            });
+            chartInstances = [];
+        }
+
+        function unpivotWideTable(sheetData) {
+            const header = sheetData[0];
+            const dataRows = sheetData.slice(1);
+            const orgNameIdx = 0;
+            const orgIdIdx = 1;
+
+            const result = [];
+            for (const row of dataRows) {
+                const orgName = row[orgNameIdx];
+                const orgId = row[orgIdIdx];
+                for (let i = 2; i < header.length; i++) {
+                    const week = header[i];
+
+                    let val = row[i];
+                    if (val === '' || val === null || val === undefined) continue;
+
+                    // Normalize string: remove % sign and commas, trim spaces
+                    if (typeof val === 'string') {
+                        val = val.replace(/%/g, '').replace(/,/g, '').trim();
+                    }
+                    
+                    const numericVal = Number(val);
+
+                    if (!isNaN(numericVal)) {
+                        // Convert decimals like 0.209 to percentage by multiplying by 100 if needed
+                        let finalVal = numericVal;
+                        if (numericVal <= 1) {
+                            finalVal = numericVal * 100;
+                        }
+                        result.push([orgName, orgId, week, finalVal]);
+                    }
+                }
+            }
+            return result;
+        }
+
+        function mergeDarAndAckData(darData, ackData) {
+            const combinedMap = {};
+
+            // Helper function to build a key
+            const getKey = (orgId, week) => `${orgId}|${week}`;
+
+            // Insert DAR data
+            darData.forEach(([orgName, orgId, week, dar]) => {
+                const key = getKey(orgId, week);
+                combinedMap[key] = {
+                    orgName: orgName,
+                    orgId: orgId,
+                    week: week,
+                    dar: dar,
+                    ack: null,
+                };
+            });
+
+            // Insert or update with Ack data
+            ackData.forEach(([orgName, orgId, week, ack]) => {
+                const key = getKey(orgId, week);
+                if (combinedMap[key]) {
+                    combinedMap[key].ack = ack;
+                } else {
+                    combinedMap[key] = {
+                        orgName: orgName,
+                        orgId: orgId,
+                        week: week,
+                        dar: null,
+                        ack: ack,
+                    };
+                }
+            });
+
+            // Convert combinedMap to array
+            const combinedRows = Object.values(combinedMap);
+
+            // Sort by orgName asc and by week chronological order if possible
+            combinedRows.sort((a, b) => {
+                if (a.orgName !== b.orgName) return a.orgName.localeCompare(b.orgName);
+                // Parse week start date: e.g. 'Apr 7 – 13' -> 'Apr 7'
+                const parseWeekStart = (w) => {
+                    const parts = w.split('–')[0].trim(); // 'Apr 7'
+                    return new Date(`${parts} 2025`); // assuming year 2025
+                };
+                return parseWeekStart(a.week) - parseWeekStart(b.week);
+            });
+
+            // Map to array of arrays for output
+            return combinedRows.map(({ orgName, orgId, week, dar, ack }) => [
+                orgName,
+                orgId,
+                week,
+                dar !== null ? dar.toFixed(2) : '',
+                ack !== null ? ack.toFixed(2) : ''
+            ]);
+        }
+
+        function createCharts(combinedData) {
+            const chartsContainer = document.createElement('div');
+            chartsContainer.className = 'charts-grid';
+
+            // Group data by organization
+            const orgData = {};
+            combinedData.forEach(([orgName, orgId, week, dar, ack]) => {
+                if (!orgData[orgName]) {
+                    orgData[orgName] = [];
+                }
+                orgData[orgName].push({
+                    week: week,
+                    dar: dar ? parseFloat(dar) : null,
+                    ack: ack ? parseFloat(ack) : null
+                });
+            });
+
+            // Create chart for each organization
+            Object.keys(orgData).forEach(orgName => {
+                const chartContainer = document.createElement('div');
+                chartContainer.className = 'chart-container';
+                
+                const title = document.createElement('div');
+                title.className = 'chart-title';
+                title.textContent = `${orgName} - DAR and Alert Ack Over Time`;
+                
+                const canvasContainer = document.createElement('div');
+                canvasContainer.className = 'chart-canvas-container';
+                
+                const canvas = document.createElement('canvas');
+                
+                chartContainer.appendChild(title);
+                canvasContainer.appendChild(canvas);
+                chartContainer.appendChild(canvasContainer);
+                chartsContainer.appendChild(chartContainer);
+
+                const data = orgData[orgName];
+                const labels = data.map(d => d.week);
+                const darValues = data.map(d => d.dar);
+                const ackValues = data.map(d => d.ack);
+
+                const chartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'DAR (%)',
+                            data: darValues,
+                            borderColor: '#1f77b4',
+                            backgroundColor: 'rgba(31, 119, 180, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 5,
+                            borderWidth: 3
+                        }, {
+                            label: 'Alert Ack (%)',
+                            data: ackValues,
+                            borderColor: '#ff7f0e',
+                            backgroundColor: 'rgba(255, 127, 14, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 5,
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Percentage (%)'
+                                },
+                                grid: {
+                                    display: true
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Week'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Track chart instance for cleanup
+                chartInstances.push(chartInstance);
+            });
+
+            return chartsContainer;
+        }
+
+        function createReport(combinedData) {
+            const reportContainer = document.createElement('div');
+            reportContainer.className = 'report-section';
+
+            const reportTitle = document.createElement('h2');
+            reportTitle.textContent = 'DAR and Alert Acknowledgment Weekly Report';
+            reportTitle.style.textAlign = 'center';
+            reportTitle.style.marginBottom = '10px';
+
+            const dateInfo = document.createElement('p');
+            dateInfo.textContent = `Generated on: ${new Date().toLocaleDateString()}`;
+            dateInfo.style.textAlign = 'center';
+            dateInfo.style.marginBottom = '30px';
+            dateInfo.style.fontStyle = 'italic';
+
+            reportContainer.appendChild(reportTitle);
+            reportContainer.appendChild(dateInfo);
+
+            // Group data by organization
+            const orgData = {};
+            combinedData.forEach(([orgName, orgId, week, dar, ack]) => {
+                if (!orgData[orgName]) {
+                    orgData[orgName] = [];
+                }
+                orgData[orgName].push({ week, dar, ack });
+            });
+
+            // Create report section for each organization
+            Object.keys(orgData).forEach(orgName => {
+                const orgSection = document.createElement('div');
+                orgSection.className = 'report-org';
+
+                const orgTitle = document.createElement('div');
+                orgTitle.className = 'report-title';
+                orgTitle.textContent = orgName;
+
+                const subtitle = document.createElement('div');
+                subtitle.className = 'report-subtitle';
+                subtitle.textContent = 'Performance Metrics for the week(s) shown:';
+
+                const checkboxes = document.createElement('div');
+                checkboxes.className = 'checkboxes';
+                
+                const spo2Checkbox = document.createElement('div');
+                spo2Checkbox.className = 'checkbox-item';
+                spo2Checkbox.innerHTML = '<span class="checkbox-icon">☐</span> <strong>SpO2 Used</strong>';
+                
+                const bpCheckbox = document.createElement('div');
+                bpCheckbox.className = 'checkbox-item';
+                bpCheckbox.innerHTML = '<span class="checkbox-icon">☐</span> <strong>BP Used</strong>';
+                
+                checkboxes.appendChild(spo2Checkbox);
+                checkboxes.appendChild(bpCheckbox);
+
+                orgSection.appendChild(orgTitle);
+                orgSection.appendChild(subtitle);
+                orgSection.appendChild(checkboxes);
+                reportContainer.appendChild(orgSection);
+            });
+
+            return reportContainer;
+        }
+
+        function processData() {
+            showStatus('Processing data...', 'info');
+
+            try {
+                // Destroy existing charts first
+                destroyAllCharts();
+
+                // Unpivot both datasets
+                const unpivotedDar = unpivotWideTable(darData);
+                const unpivotedAck = unpivotWideTable(ackData);
+
+                // Merge datasets
+                const combined = mergeDarAndAckData(unpivotedDar, unpivotedAck);
+
+                // Display results
+                const resultsDiv = document.getElementById('resultsDiv');
+                resultsDiv.innerHTML = ''; // Clear previous results
+
+                // Combined data table
+                const dataSection = document.createElement('div');
+                dataSection.className = 'combined-data';
+                dataSection.innerHTML = '<h3>Combined DAR & Alert Ack Data</h3>';
+                
+                const table = document.createElement('table');
+                table.className = 'data-table';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Org Name</th>
+                            <th>Org ID</th>
+                            <th>Week</th>
+                            <th>DAR (%)</th>
+                            <th>Alert Ack (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${combined.map(row => 
+                            `<tr>
+                                <td>${row[0]}</td>
+                                <td>${row[1]}</td>
+                                <td>${row[2]}</td>
+                                <td>${row[3]}</td>
+                                <td>${row[4]}</td>
+                            </tr>`
+                        ).join('')}
+                    </tbody>
+                `;
+                
+                dataSection.appendChild(table);
+                resultsDiv.appendChild(dataSection);
+
+                // Charts
+                if (combined.length > 0) {
+                    const chartsTitle = document.createElement('h3');
+                    chartsTitle.textContent = 'Performance Charts';
+                    chartsTitle.style.marginTop = '30px';
+                    resultsDiv.appendChild(chartsTitle);
+                    
+                    const charts = createCharts(combined);
+                    resultsDiv.appendChild(charts);
+
+                    // Report
+                    const report = createReport(combined);
+                    resultsDiv.appendChild(report);
+                }
+
+                resultsDiv.style.display = 'block';
+                showStatus('Data processed successfully! Charts and report generated.', 'success');
+
+            } catch (error) {
+                showStatus(`Error processing data: ${error.message}`, 'error');
+                console.error('Processing error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
