@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAR & Alert Ack Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .auto-load-section {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .file-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .file-status-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: left;
+        }
+
+        .file-status-item.loading {
+            border-left-color: #3b82f6;
+        }
+
+        .file-status-item.loaded {
+            border-left-color: #10b981;
+        }
+
+        .file-status-item.error {
+            border-left-color: #ef4444;
+        }
+
+        .file-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .file-info {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .reload-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 15px 10px;
+        }
+
+        .reload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .process-btn {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.3);
+        }
+
+        .process-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Week Selector */
+        .week-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .week-selector select {
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin: 0 10px;
+            min-width: 150px;
+        }
+
+        /* Facility Selector */
+        .facility-controls {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .facility-selector {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .facility-selector select {
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            min-width: 200px;
+        }
+
+        .accessory-status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .accessory-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .accessory-item.active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        /* Collapsible Data Section */
+        .combined-data {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 15px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .collapsible-header:hover {
+            background: #f9fafb;
+            margin: 0 -20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #374151;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .chart-canvas-container {
+            flex: 1;
+            position: relative;
+            height: 300px;
+            min-height: 300px;
+        }
+
+        .chart-canvas-container canvas {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .status {
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status.error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .status.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+        }
+
+        .warning {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 2px solid #3b82f6;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .facility-selector {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .accessory-status {
+                justify-content: center;
+            }
+            
+            .file-status {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DAR & Alert Ack Analysis Tool</h1>
+            <p>Automatically loading CSV files from the current directory</p>
+        </div>
+
+        <div class="content">
+            <div class="auto-load-section">
+                <h3>📊 Auto-Loading Data Files</h3>
+                <p>The system will automatically fetch these 3 CSV files from the current directory:</p>
+                
+                <div class="file-status" id="fileStatus">
+                    <div class="file-status-item loading" id="darStatus">
+                        <div class="file-title">📈 DAR Data</div>
+                        <div class="file-info" id="darInfo">
+                            <span class="spinner"></span>Loading dar_data.csv...
+                        </div>
+                    </div>
+                    <div class="file-status-item loading" id="ackStatus">
+                        <div class="file-title">🔔 Alert Acknowledgment</div>
+                        <div class="file-info" id="ackInfo">
+                            <span class="spinner"></span>Loading ack_data.csv...
+                        </div>
+                    </div>
+                    <div class="file-status-item loading" id="accessoryStatus">
+                        <div class="file-title">🩺 Accessory Usage</div>
+                        <div class="file-info" id="accessoryInfo">
+                            <span class="spinner"></span>Loading accessory_data.csv...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning" id="serverWarning" style="display: none;">
+                    ⚠️ <strong>Server Required:</strong> This tool requires a web server to fetch files automatically. 
+                    Please serve this HTML file using a local web server (e.g., Python's http.server, Node.js http-server, or similar).
+                </div>
+                
+                <button class="reload-btn" onclick="loadAllFiles()">
+                    🔄 Reload Files
+                </button>
+                
+                <button class="process-btn" id="processBtn" onclick="processData()" disabled>
+                    Process Data & Generate Report
+                </button>
+            </div>
+
+            <div id="statusDiv"></div>
+            <div id="resultsDiv" class="results-section" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let darData = null;
+        let ackData = null;
+        let accessoryData = null;
+        let chartInstances = [];
+        let combinedData = [];
+        let accessoryMap = {};
+
+        // File configuration - you can modify these filenames as needed
+        const FILES_CONFIG = {
+            dar: {
+                filename: 'dar_data.csv',
+                displayName: 'DAR Data',
+                required: true
+            },
+            ack: {
+                filename: 'ack_data.csv', 
+                displayName: 'Alert Acknowledgment',
+                required: true
+            },
+            accessory: {
+                filename: 'accessory_data.csv',
+                displayName: 'Accessory Usage', 
+                required: false
+            }
+        };
+
+        // Auto-load files when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllFiles();
+        });
+
+        async function loadAllFiles() {
+            showStatus('Loading files from directory...', 'info');
+            
+            // Reset file statuses
+            Object.keys(FILES_CONFIG).forEach(type => {
+                const statusElement = document.getElementById(`${type}Status`);
+                const infoElement = document.getElementById(`${type}Info`);
+                statusElement.className = 'file-status-item loading';
+                infoElement.innerHTML = `<span class="spinner"></span>Loading ${FILES_CONFIG[type].filename}...`;
+            });
+
+            // Load all files concurrently
+            const loadPromises = Object.keys(FILES_CONFIG).map(type => 
+                loadFileData(type, FILES_CONFIG[type])
+            );
+
+            await Promise.all(loadPromises);
+            checkFilesReady();
+        }
+
+        async function loadFileData(type, config) {
+            const statusElement = document.getElementById(`${type}Status`);
+            const infoElement = document.getElementById(`${type}Info`);
+            
+            try {
+                // Fetch CSV file from same directory
+                const response = await fetch(config.filename);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const csvText = await response.text();
+                const fileSize = (csvText.length / 1024).toFixed(1);
+                
+                // Parse CSV using PapaParse
+                Papa.parse(csvText, {
+                    complete: function(results) {
+                        // Store parsed data
+                        switch(type) {
+                            case 'dar':
+                                darData = results.data;
+                                break;
+                            case 'ack':
+                                ackData = results.data;
+                                break;
+                            case 'accessory':
+                                accessoryData = results.data;
+                                processAccessoryData();
+                                break;
+                        }
+                        
+                        // Update status
+                        statusElement.className = 'file-status-item loaded';
+                        infoElement.innerHTML = `✅ ${config.filename} loaded (${fileSize} KB, ${results.data.length} rows)`;
+                    },
+                    error: function(error) {
+                        statusElement.className = 'file-status-item error';
+                        infoElement.innerHTML = `❌ Parse error: ${error.message}`;
+                    },
+                    header: false,
+                    skipEmptyLines: true
+                });
+                
+            } catch (error) {
+                statusElement.className = 'file-status-item error';
+                
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    // Network error - likely CORS or file not found
+                    infoElement.innerHTML = `❌ Cannot fetch ${config.filename} (File not found or CORS issue)`;
+                    document.getElementById('serverWarning').style.display = 'block';
+                } else {
+                    infoElement.innerHTML = `❌ Error: ${error.message}`;
+                }
+                
+                // If it's an optional file, don't block processing
+                if (!config.required) {
+                    console.warn(`Optional file ${config.filename} failed to load:`, error);
+                }
+            }
+        }
+
+        function processAccessoryData() {
+            if (!accessoryData || accessoryData.length < 2) return;
+            
+            // Expected format: Facility_ID, Facility_Name, SpO2_Used, BP_Used
+            const header = accessoryData[0];
+            for (let i = 1; i < accessoryData.length; i++) {
+                const row = accessoryData[i];
+                if (row.length >= 4) {
+                    const facilityId = row[0];
+                    const facilityName = row[1];
+                    const spo2Used = row[2]?.toLowerCase() === 'true' || row[2] === '1';
+                    const bpUsed = row[3]?.toLowerCase() === 'true' || row[3] === '1';
+                    
+                    accessoryMap[facilityId] = {
+                        name: facilityName,
+                        spo2: spo2Used,
+                        bp: bpUsed
+                    };
+                }
+            }
+        }
+
+        function checkFilesReady() {
+            const processBtn = document.getElementById('processBtn');
+            const requiredFiles = ['dar', 'ack'];
+            const loadedRequired = requiredFiles.filter(type => 
+                type === 'dar' ? darData : ackData
+            );
+            
+            if (loadedRequired.length === requiredFiles.length) {
+                processBtn.disabled = false;
+                showStatus(`✅ Required files loaded successfully! 
+                    DAR: ${darData?.length || 0} rows, 
+                    ACK: ${ackData?.length || 0} rows
+                    ${accessoryData ? `, Accessory: ${accessoryData.length} rows` : ' (Accessory: Not loaded)'}`, 'success');
+            } else {
+                processBtn.disabled = true;
+                const missing = requiredFiles.filter(type => 
+                    !(type === 'dar' ? darData : ackData)
+                );
+                showStatus(`❌ Missing required files: ${missing.map(t => FILES_CONFIG[t].filename).join(', ')}`, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusDiv');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function destroyAllCharts() {
+            chartInstances.forEach(chart => {
+                if (chart) {
+                    chart.destroy();
+                }
+            });
+            chartInstances = [];
+        }
+
+        function unpivotWideTable(sheetData) {
+            const header = sheetData[0];
+            const dataRows = sheetData.slice(1);
+            const orgNameIdx = 0;
+            const orgIdIdx = 1;
+
+            const result = [];
+            for (const row of dataRows) {
+                const orgName = row[orgNameIdx];
+                const orgId = row[orgIdIdx];
+                for (let i = 2; i < header.length; i++) {
+                    const week = header[i];
+
+                    let val = row[i];
+                    if (val === '' || val === null || val === undefined) continue;
+
+                    if (typeof val === 'string') {
+                        val = val.replace(/%/g, '').replace(/,/g, '').trim();
+                    }
+                    
+                    const numericVal = Number(val);
+
+                    if (!isNaN(numericVal)) {
+                        let finalVal = numericVal;
+                        if (numericVal <= 1) {
+                            finalVal = numericVal * 100;
+                        }
+                        result.push([orgName, orgId, week, finalVal]);
+                    }
+                }
+            }
+            return result;
+        }
+
+        function mergeDarAndAckData(darData, ackData) {
+            const combinedMap = {};
+            const getKey = (orgId, week) => `${orgId}|${week}`;
+
+            darData.forEach(([orgName, orgId, week, dar]) => {
+                const key = getKey(orgId, week);
+                combinedMap[key] = {
+                    orgName: orgName,
+                    orgId: orgId,
+                    week: week,
+                    dar: dar,
+                    ack: null,
+                };
+            });
+
+            ackData.forEach(([orgName, orgId, week, ack]) => {
+                const key = getKey(orgId, week);
+                if (combinedMap[key]) {
+                    combinedMap[key].ack = ack;
+                } else {
+                    combinedMap[key] = {
+                        orgName: orgName,
+                        orgId: orgId,
+                        week: week,
+                        dar: null,
+                        ack: ack,
+                    };
+                }
+            });
+
+            const combinedRows = Object.values(combinedMap);
+            combinedRows.sort((a, b) => {
+                if (a.orgName !== b.orgName) return a.orgName.localeCompare(b.orgName);
+                const parseWeekStart = (w) => {
+                    const parts = w.split('–')[0].trim();
+                    return new Date(`${parts} 2025`);
+                };
+                return parseWeekStart(a.week) - parseWeekStart(b.week);
+            });
+
+            return combinedRows.map(({ orgName, orgId, week, dar, ack }) => [
+                orgName,
+                orgId,
+                week,
+                dar !== null ? dar.toFixed(2) : '',
+                ack !== null ? ack.toFixed(2) : ''
+            ]);
+        }
+
+        function createFacilitySelector(combinedData) {
+            const facilities = [...new Set(combinedData.map(row => row[0]))];
+            const facilityControls = document.createElement('div');
+            facilityControls.className = 'facility-controls';
+            
+            const selectorDiv = document.createElement('div');
+            selectorDiv.className = 'facility-selector';
+            
+            const label = document.createElement('label');
+            label.innerHTML = '<strong>Select Facility:</strong>';
+            
+            const select = document.createElement('select');
+            select.id = 'facilitySelector';
+            select.innerHTML = '<option value="">All Facilities</option>';
+            
+            facilities.forEach(facility => {
+                const option = document.createElement('option');
+                option.value = facility;
+                option.textContent = facility;
+                select.appendChild(option);
+            });
+            
+            const accessoryStatus = document.createElement('div');
+            accessoryStatus.className = 'accessory-status';
+            accessoryStatus.id = 'accessoryStatus';
+            
+            selectorDiv.appendChild(label);
+            selectorDiv.appendChild(select);
+            facilityControls.appendChild(selectorDiv);
+            facilityControls.appendChild(accessoryStatus);
+            
+            select.addEventListener('change', function(e) {
+                updateAccessoryStatus(e.target.value);
+                updateChartsForFacility(e.target.value);
+            });
+            
+            return facilityControls;
+        }
+
+        function updateAccessoryStatus(facilityName) {
+            const statusDiv = document.getElementById('accessoryStatus');
+            if (!facilityName) {
+                statusDiv.innerHTML = '';
+                return;
+            }
+            
+            const facilityRow = combinedData.find(row => row[0] === facilityName);
+            const facilityId = facilityRow ? facilityRow[1] : null;
+            
+            const accessory = accessoryMap[facilityId];
+            if (accessory) {
+                statusDiv.innerHTML = `
+                    <div class="accessory-item ${accessory.spo2 ? 'active' : ''}">
+                        <span>${accessory.spo2 ? '✓' : '✗'}</span> SpO2 Used
+                    </div>
+                    <div class="accessory-item ${accessory.bp ? 'active' : ''}">
+                        <span>${accessory.bp ? '✓' : '✗'}</span> BP Used
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="accessory-item">
+                        <span>?</span> SpO2 Status Unknown
+                    </div>
+                    <div class="accessory-item">
+                        <span>?</span> BP Status Unknown
+                    </div>
+                `;
+            }
+        }
+
+        function createCollapsibleDataTable(combinedData) {
+            const dataSection = document.createElement('div');
+            dataSection.className = 'combined-data';
+            
+            const header = document.createElement('div');
+            header.className = 'collapsible-header';
+            header.innerHTML = `
+                <h3>Combined DAR & Alert Ack Data (${combinedData.length} records)</h3>
+                <span class="toggle-icon">▼</span>
+            `;
+            
+            const content = document.createElement('div');
+            content.className = 'collapsible-content';
+            
+            const table = document.createElement('table');
+            table.className = 'data-table';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Org Name</th>
+                        <th>Org ID</th>
+                        <th>Week</th>
+                        <th>DAR (%)</th>
+                        <th>Alert Ack (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${combinedData.map(row => 
+                        `<tr>
+                            <td>${row[0]}</td>
+                            <td>${row[1]}</td>
+                            <td>${row[2]}</td>
+                            <td>${row[3]}</td>
+                            <td>${row[4]}</td>
+                        </tr>`
+                    ).join('')}
+                </tbody>
+            `;
+            
+            content.appendChild(table);
+            dataSection.appendChild(header);
+            dataSection.appendChild(content);
+            
+            header.addEventListener('click', function() {
+                const isExpanded = content.classList.contains('expanded');
+                const icon = header.querySelector('.toggle-icon');
+                
+                if (isExpanded) {
+                    content.classList.remove('expanded');
+                    icon.classList.remove('expanded');
+                } else {
+                    content.classList.add('expanded');
+                    icon.classList.add('expanded');
+                }
+            });
+            
+            return dataSection;
+        }
+
+        function createCharts(combinedData, selectedFacility = '', selectedWeek = '') {
+            const chartsContainer = document.createElement('div');
+            chartsContainer.className = 'charts-grid';
+            chartsContainer.id = 'chartsContainer';
+
+            let filteredData = combinedData;
+            if (selectedFacility) {
+                filteredData = combinedData.filter(row => row[0] === selectedFacility);
+            }
+            if (selectedWeek) {
+                filteredData = filteredData.filter(row => row[2] === selectedWeek);
+            }
+
+            const orgData = {};
+            filteredData.forEach(([orgName, orgId, week, dar, ack]) => {
+                if (!orgData[orgName]) {
+                    orgData[orgName] = [];
+                }
+                orgData[orgName].push({
+                    week: week,
+                    dar: dar ? parseFloat(dar) : null,
+                    ack: ack ? parseFloat(ack) : null
+                });
+            });
+
+            Object.keys(orgData).forEach(orgName => {
+                const chartContainer = document.createElement('div');
+                chartContainer.className = 'chart-container';
+                
+                const facilityRow = combinedData.find(row => row[0] === orgName);
+                const facilityId = facilityRow ? facilityRow[1] : null;
+                const accessory = accessoryMap[facilityId];
+                const accessories = [];
+                if (accessory?.spo2) accessories.push('SpO2');
+                if (accessory?.bp) accessories.push('BP');
+                const accessoryText = accessories.length > 0 ? ` (${accessories.join(', ')})` : '';
+                
+                const title = document.createElement('div');
+                title.className = 'chart-title';
+                title.textContent = `${orgName}${accessoryText}`;
+                
+                const canvasContainer = document.createElement('div');
+                canvasContainer.className = 'chart-canvas-container';
+                
+                const canvas = document.createElement('canvas');
+                
+                chartContainer.appendChild(title);
+                canvasContainer.appendChild(canvas);
+                chartContainer.appendChild(canvasContainer);
+                chartsContainer.appendChild(chartContainer);
+
+                const data = orgData[orgName];
+                const labels = data.map(d => d.week);
+                const darValues = data.map(d => d.dar);
+                const ackValues = data.map(d => d.ack);
+
+                const chartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'DAR (%)',
+                            data: darValues,
+                            borderColor: '#1f77b4',
+                            backgroundColor: 'rgba(31, 119, 180, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 5,
+                            borderWidth: 3
+                        }, {
+                            label: 'Alert Ack (%)',
+                            data: ackValues,
+                            borderColor: '#ff7f0e',
+                            backgroundColor: 'rgba(255, 127, 14, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 5,
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Percentage (%)'
+                                },
+                                grid: {
+                                    display: true
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Week'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+
+                chartInstances.push(chartInstance);
+            });
+
+            return chartsContainer;
+        }
+
+        function updateChartsForFacility(selectedFacility) {
+            const selectedWeek = document.getElementById('weekSelector')?.value || '';
+            destroyAllCharts();
+            
+            const chartsContainer = document.getElementById('chartsContainer');
+            if (chartsContainer) {
+                const newCharts = createCharts(combinedData, selectedFacility, selectedWeek);
+                chartsContainer.parentNode.replaceChild(newCharts, chartsContainer);
+            }
+        }
+
+        function updateChartsForWeek(selectedWeek) {
+            const selectedFacility = document.getElementById('facilitySelector')?.value || '';
+            destroyAllCharts();
+            
+            const chartsContainer = document.getElementById('chartsContainer');
+            if (chartsContainer) {
+                const newCharts = createCharts(combinedData, selectedFacility, selectedWeek);
+                chartsContainer.parentNode.replaceChild(newCharts, chartsContainer);
+            }
+        }
+
+        function processData() {
+            showStatus('Processing data...', 'info');
+
+            try {
+                destroyAllCharts();
+
+                const unpivotedDar = unpivotWideTable(darData);
+                const unpivotedAck = unpivotWideTable(ackData);
+                combinedData = mergeDarAndAckData(unpivotedDar, unpivotedAck);
+
+                const resultsDiv = document.getElementById('resultsDiv');
+                resultsDiv.innerHTML = '';
+
+                // Week selector
+                const weeks = [...new Set(combinedData.map(row => row[2]))];
+                const weekSelector = document.createElement('div');
+                weekSelector.className = 'week-selector';
+                weekSelector.innerHTML = `
+                    <label><strong>Filter by Week:</strong></label>
+                    <select id="weekSelector">
+                        <option value="">All Weeks</option>
+                        ${weeks.map(week => `<option value="${week}">${week}</option>`).join('')}
+                    </select>
+                `;
+                weekSelector.querySelector('select').addEventListener('change', function(e) {
+                    updateChartsForWeek(e.target.value);
+                });
+                resultsDiv.appendChild(weekSelector);
+
+                // Facility selector
+                const facilitySelector = createFacilitySelector(combinedData);
+                resultsDiv.appendChild(facilitySelector);
+
+                // Collapsible data table
+                const dataTable = createCollapsibleDataTable(combinedData);
+                resultsDiv.appendChild(dataTable);
+
+                // Charts
+                if (combinedData.length > 0) {
+                    const chartsTitle = document.createElement('h3');
+                    chartsTitle.textContent = 'Performance Charts';
+                    chartsTitle.style.marginTop = '30px';
+                    resultsDiv.appendChild(chartsTitle);
+                    
+                    const charts = createCharts(combinedData);
+                    resultsDiv.appendChild(charts);
+                }
+
+                resultsDiv.style.display = 'block';
+                showStatus('Data processed successfully! Interactive analysis ready.', 'success');
+
+            } catch (error) {
+                showStatus(`Error processing data: ${error.message}`, 'error');
+                console.error('Processing error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
